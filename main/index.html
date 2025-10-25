@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>chugwonmoon</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 메인 컨테이너 -->
+    <div class="app-container">
+        <!-- 왼쪽 컬럼 - 텍스트와 스크립트 -->
+        <div class="left-column">
+            <!-- 상단 텍스트 -->
+            <div class="instruction-text">
+                <img src="../assets/text1.png" alt="사용법 안내" class="text-image">
+            </div>
+            
+            <!-- 중앙 스크립트 -->
+            <div class="script-area">
+                <img src="../assets/casting.png" alt="산스크리트 스크립트" class="script-image">
+            </div>
+            
+            <!-- 하단 텍스트 -->
+            <div class="control-text">
+                <img src="../assets/text2.png" alt="조작법 안내" class="text-image">
+            </div>
+        </div>
+
+        <!-- 중앙 컬럼 - 웹캠과 타이핑 -->
+        <div class="center-column">
+            <!-- 웹캠 영역 -->
+            <div class="webcam-container">
+                <video id="video" autoplay muted playsinline></video>
+                <canvas id="overlay"></canvas>
+            </div>
+            
+            <!-- 타이핑 영역 -->
+            <div class="typing-area">
+                <div class="typing-text" id="outputText">손을 카메라에 보여주세요</div>
+            </div>
+        </div>
+
+        <!-- 오른쪽 컬럼 - 로고와 이미지 -->
+        <div class="right-column">
+            <!-- 상단 로고 -->
+            <div class="top-logo">
+                <img src="../assets/logo.png" alt="chugwonmoon" class="logo-image">
+            </div>
+            
+            <!-- 이미지 스택 (img1, img2, img3만) -->
+            <div class="images-stack">
+                <div class="image-item">
+                    <img src="../assets/img1.png" alt="이미지1" class="stack-image">
+                </div>
+                <div class="image-item">
+                    <img src="../assets/img2.png" alt="이미지2" class="stack-image">
+                </div>
+                <div class="image-item">
+                    <img src="../assets/img3.png" alt="이미지3" class="stack-image">
+                </div>
+            </div>
+        </div>
+
+        <!-- 합장 진행 상태 표시 -->
+        <div class="prayer-progress" id="prayerProgress" style="display: none;">
+            <div class="prayer-text">합장 중... 텍스트를 아카이브로 보내는 중</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 출력 영역 (숨김) -->
+    <div id="output" style="display: none;"></div>
+    <div id="legend" style="display: none;"></div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
