@@ -38,7 +38,7 @@ let spaceState = {
 let prayerState = {
   isPraying: false,
   prayerStartTime: 0,
-  prayerDuration: 3000, // 3초
+  prayerDuration: 2000, // 2초
   prayerProgress: 0,
   prayerTimer: null,
   lastDetectionTime: 0,
@@ -428,6 +428,31 @@ function detectPrayer(left, right) {
   return isPraying;
 }
 
+// 원들을 순차적으로 채우는 함수
+function fillDotsSequentially() {
+  const dots = document.querySelectorAll('.loading-dot');
+  let currentDot = 0;
+  
+  // 모든 원 초기화
+  dots.forEach(dot => {
+    dot.classList.remove('filled');
+  });
+  
+  // 순차적으로 원 채우기
+  const fillInterval = setInterval(() => {
+    if (currentDot < dots.length) {
+      dots[currentDot].classList.add('filled');
+      currentDot++;
+    } else {
+      clearInterval(fillInterval);
+      // 모든 원이 채워지면 메시지 전송
+      setTimeout(() => {
+        completePrayer();
+      }, 200); // 마지막 원이 채워진 후 잠깐 대기
+    }
+  }, 250); // 250ms마다 하나씩 채우기 (2초 / 8개 = 250ms)
+}
+
 // 합장 시작
 function startPrayer() {
   if (prayerState.isPraying) return;
@@ -436,31 +461,17 @@ function startPrayer() {
   prayerState.prayerStartTime = performance.now();
   prayerState.prayerProgress = 0;
   
-  // 진행 상태 UI 표시
-  const progressEl = document.getElementById('prayerProgress');
-  const progressFillEl = document.getElementById('progressFill');
+  // 로딩 창 표시
+  const loadingWindowEl = document.getElementById('loadingWindow');
   
-  if (progressEl && progressFillEl) {
-    progressEl.style.display = 'block';
-    progressFillEl.classList.add('active');
+  if (loadingWindowEl) {
+    loadingWindowEl.style.display = 'block';
   }
   
   console.log('🙏 합장 시작!');
   
-  // 진행 상태 업데이트 타이머
-  prayerState.prayerTimer = setInterval(() => {
-    const elapsed = performance.now() - prayerState.prayerStartTime;
-    prayerState.prayerProgress = Math.min(elapsed / prayerState.prayerDuration, 1);
-    
-    if (progressFillEl) {
-      progressFillEl.style.width = `${prayerState.prayerProgress * 100}%`;
-    }
-    
-    // 3초 완료 시 아카이브로 이동
-    if (prayerState.prayerProgress >= 1) {
-      completePrayer();
-    }
-  }, 50); // 50ms마다 업데이트
+  // 원들을 순차적으로 채우기
+  fillDotsSequentially();
 }
 
 // 합장 중단
@@ -471,19 +482,22 @@ function stopPrayer() {
   
   // 타이머 정리
   if (prayerState.prayerTimer) {
-    clearInterval(prayerState.prayerTimer);
+    clearTimeout(prayerState.prayerTimer);
     prayerState.prayerTimer = null;
   }
   
-  // 진행 상태 UI 숨기기
-  const progressEl = document.getElementById('prayerProgress');
-  const progressFillEl = document.getElementById('progressFill');
+  // 로딩 창 숨기기 및 원들 초기화
+  const loadingWindowEl = document.getElementById('loadingWindow');
+  const dots = document.querySelectorAll('.loading-dot');
   
-  if (progressEl && progressFillEl) {
-    progressEl.style.display = 'none';
-    progressFillEl.style.width = '0%';
-    progressFillEl.classList.remove('active');
+  if (loadingWindowEl) {
+    loadingWindowEl.style.display = 'none';
   }
+  
+  // 모든 원 초기화
+  dots.forEach(dot => {
+    dot.classList.remove('filled');
+  });
   
   console.log('🙏 합장 중단');
 }
@@ -541,7 +555,7 @@ async function startCam(){
   el.video.classList.add('on');
   
   // 비디오 밝기 조정을 위한 CSS 필터 적용
-  el.video.style.filter = 'brightness(1.3) contrast(1.2) saturate(1.1)';
+  el.video.style.filter = 'brightness(1.3) contrast(1.2) saturate(0.3)';
 }
 
 function prayerConfirm(left,right){
@@ -834,8 +848,7 @@ async function loop(){
     prayerConfirm(left,right);
   }
 
-  // 디버그 정보 표시
-  drawDebugInfo(left, right);
+  // 디버그 정보 표시 제거됨
 
     const dt = t-lastT; if(dt>0){ fps=1000/dt; } lastT=t;
     if((t|0)%6===0 && el.fpsChip){ 
@@ -895,7 +908,7 @@ function resetAll(){
   prayerState = {
     isPraying: false,
     prayerStartTime: 0,
-    prayerDuration: 3000,
+    prayerDuration: 2000,
     prayerProgress: 0,
     prayerTimer: null,
     lastDetectionTime: 0,

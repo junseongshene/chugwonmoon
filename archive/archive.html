@@ -3,29 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Typing Archive</title>
+    <title>Archive - chugwonmoon</title>
     <link rel="stylesheet" href="archive.css">
 </head>
 <body>
-    <div class="archive-container">
-        <div class="archive-header">
-            <h1 class="archive-title">Typing Archive</h1>
-            <p class="archive-subtitle">손으로 입력한 메시지들</p>
-        </div>
-
-        <div class="messages-container" id="messagesContainer">
-            <!-- 메시지들이 동적으로 추가됩니다 -->
-        </div>
-
-        <div class="archive-footer">
-            <div class="archive-info">총 <span id="totalMessages">0</span>개의 메시지</div>
-            <div class="archive-controls">
-                <button class="clear-button" onclick="clearAllMessages()" title="모든 메시지 삭제">🗑️ 전체 삭제</button>
-                <button class="back-button" onclick="goBack()">메인으로 돌아가기</button>
-            </div>
-        </div>
+    <div class="logo-container">
+        <img src="../assets/logo.png" alt="chugwonmoon" class="archive-logo">
     </div>
-
+    <button class="reset-button" onclick="clearAllMessages()">전체 초기화</button>
+    <div class="archive-container">
+        <!-- 메시지들이 동적으로 추가됩니다 -->
+    </div>
+    <div class="bottom-images">
+        <img src="../assets/img1.png" alt="이미지1" class="bottom-img">
+        <img src="../assets/img2.png" alt="이미지2" class="bottom-img">
+        <img src="../assets/img3.png" alt="이미지3" class="bottom-img">
+    </div>
     <script src="archive.js"></script>
 </body>
 </html>
