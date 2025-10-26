@@ -59,12 +59,15 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
+  transform: translateY(-3vh);
 }
 
 .text-image {
-  width: 60%;
+  width: 100%;
   height: auto;
   object-fit: contain;
+  max-width: 600px;
+  max-height: 240px;
 }
 
 .script-area {
@@ -88,6 +91,7 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
+  transform: translateY(3vh);
 }
 
 /* 중앙 컬럼 - 웹캠과 타이핑 */
@@ -135,45 +139,49 @@ body::before {
 
 .typing-area {
     width: 100%;
-    height: 6vh;
+    height: 12vh;
     background: rgba(60, 60, 60, 0.9);
     border-radius: 0;
-    padding: 8px 12px;
+    padding: 0;
     box-shadow: none;
     border: none;
     backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 40px;
+    min-height: 80px;
+    position: relative;
 }
 
 .typing-text {
-  font-size: 24px !important;
+  font-size: 48px !important;
   font-weight: 400 !important;
-  color: white;
+  color: whitesmoke;
   text-align: center;
   position: relative;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+  font-family: 'Times New Roman', Times, serif;
   width: 100%;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
   line-height: 1;
-  transform: translateY(2px);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-all;
 }
 
 .typing-text::after {
   content: "|";
   color: #007aff;
-  font-size: 24px !important;
+  font-size: 48px !important;
   font-weight: 400 !important;
+  font-family: 'Times New Roman', Times, serif;
   animation: blink 1s infinite;
   margin-left: 2px;
+  display: inline;
+  vertical-align: baseline;
 }
 
 @keyframes blink {
@@ -258,14 +266,14 @@ body::before {
 
 .circular-loader {
   position: relative;
-  width: 80px;
-  height: 80px;
+  width: 160px;
+  height: 160px;
 }
 
 .loading-dot {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: white;
   border: 1px solid #ccc;
@@ -279,8 +287,8 @@ body::before {
   transform: translateX(-50%);
 }
 .loading-dot:nth-child(2) { 
-  top: 15px; 
-  right: 15px;
+  top: 30px; 
+  right: 30px;
 }
 .loading-dot:nth-child(3) { 
   top: 50%; 
@@ -288,8 +296,8 @@ body::before {
   transform: translateY(-50%);
 }
 .loading-dot:nth-child(4) { 
-  bottom: 15px; 
-  right: 15px;
+  bottom: 30px; 
+  right: 30px;
 }
 .loading-dot:nth-child(5) { 
   bottom: 0; 
@@ -297,8 +305,8 @@ body::before {
   transform: translateX(-50%);
 }
 .loading-dot:nth-child(6) { 
-  bottom: 15px; 
-  left: 15px;
+  bottom: 30px; 
+  left: 30px;
 }
 .loading-dot:nth-child(7) { 
   top: 50%; 
@@ -306,10 +314,34 @@ body::before {
   transform: translateY(-50%);
 }
 .loading-dot:nth-child(8) { 
-  top: 15px; 
-  left: 15px;
+  top: 30px; 
+  left: 30px;
 }
 
 .loading-dot.filled {
   background: black;
+}
+
+/* 4K 해상도 최적화 */
+@media (min-width: 3840px) {
+  .typing-text {
+    font-size: 64px !important;
+    line-height: 1;
+    white-space: normal;
+  }
+  
+  .typing-text::after {
+    font-size: 64px !important;
+    vertical-align: baseline;
+    display: inline;
+  }
+  
+  .typing-area {
+    height: 16vh;
+    min-height: 120px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 }

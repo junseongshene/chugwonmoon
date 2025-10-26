@@ -12,18 +12,18 @@ function loadArchivedMessages() {
 
   // 테스트용 메시지들 생성 (비주얼 실험용)
   const testMessages = [
-    { text: 'Hello world', timestamp: Date.now() - 1000, stats: { tap: 5, erase: 0, layer: 0, space: 0 } },
-    { text: 'Good morning', timestamp: Date.now() - 2000, stats: { tap: 4, erase: 1, layer: 0, space: 1 } },
-    { text: 'Thank you', timestamp: Date.now() - 3000, stats: { tap: 6, erase: 0, layer: 0, space: 0 } },
-    { text: 'Have a nice day', timestamp: Date.now() - 4000, stats: { tap: 5, erase: 0, layer: 0, space: 1 } },
-    { text: 'Sweet dreams', timestamp: Date.now() - 5000, stats: { tap: 5, erase: 0, layer: 0, space: 1 } },
-    { text: 'Love you', timestamp: Date.now() - 6000, stats: { tap: 5, erase: 0, layer: 0, space: 1 } },
-    { text: 'Stay strong', timestamp: Date.now() - 7000, stats: { tap: 5, erase: 0, layer: 0, space: 1 } },
-    { text: 'Be happy', timestamp: Date.now() - 8000, stats: { tap: 5, erase: 0, layer: 0, space: 1 } },
-    { text: 'Never give up', timestamp: Date.now() - 9000, stats: { tap: 6, erase: 0, layer: 0, space: 1 } },
-    { text: 'Keep smiling', timestamp: Date.now() - 10000, stats: { tap: 6, erase: 0, layer: 0, space: 1 } },
-    { text: 'You are amazing', timestamp: Date.now() - 11000, stats: { tap: 5, erase: 0, layer: 0, space: 1 } },
-    { text: 'Dream big', timestamp: Date.now() - 12000, stats: { tap: 7, erase: 0, layer: 0, space: 1 } }
+    { text: 'Be Happy', timestamp: Date.now() - 1000, stats: { tap: 5, erase: 0, layer: 0, space: 0 } },
+    { text: 'Stay Strong', timestamp: Date.now() - 2000, stats: { tap: 4, erase: 1, layer: 0, space: 1 } },
+    { text: 'Dream Big', timestamp: Date.now() - 3000, stats: { tap: 6, erase: 0, layer: 0, space: 0 } },
+    { text: 'Find Peace', timestamp: Date.now() - 4000, stats: { tap: 5, erase: 0, layer: 0, space: 1 } },
+    { text: 'Stay Free', timestamp: Date.now() - 5000, stats: { tap: 5, erase: 0, layer: 0, space: 1 } },
+    { text: 'Keep Hope', timestamp: Date.now() - 6000, stats: { tap: 5, erase: 0, layer: 0, space: 1 } },
+    { text: 'Stay Brave', timestamp: Date.now() - 7000, stats: { tap: 5, erase: 0, layer: 0, space: 1 } },
+    { text: 'Find Love', timestamp: Date.now() - 8000, stats: { tap: 5, erase: 0, layer: 0, space: 1 } },
+    { text: 'Be Wise', timestamp: Date.now() - 9000, stats: { tap: 6, erase: 0, layer: 0, space: 1 } },
+    { text: 'Stay Kind', timestamp: Date.now() - 10000, stats: { tap: 6, erase: 0, layer: 0, space: 1 } },
+    { text: 'Feel Joy', timestamp: Date.now() - 11000, stats: { tap: 5, erase: 0, layer: 0, space: 1 } },
+    { text: 'Stay True', timestamp: Date.now() - 12000, stats: { tap: 7, erase: 0, layer: 0, space: 1 } }
   ];
 
   // 테스트 메시지들을 시간순으로 정렬하여 표시
@@ -191,10 +191,10 @@ function clearAllMessages() {
       data: {}
     });
 
-    // 현재 페이지에서도 초기화
-    showEmptyState();
+    // 초기 12개 테스트 메시지 다시 로드
+    loadArchivedMessages();
 
-    console.log('🗑️ 전체 아카이브 초기화됨');
+    console.log('🗑️ 로컬 스토리지 초기화됨, 테스트 메시지 복원');
   }
 }
 
@@ -214,9 +214,8 @@ function addMessageToUI(message) {
     container.innerHTML = '';
   }
 
-  // 새 메시지 카드 생성 및 맨 위에 추가
-  const card = createMessageCard(message, 0);
-  container.insertBefore(card, container.firstChild);
+  // 스크롤 애니메이션과 함께 새 메시지 추가
+  addNewMessageWithScrollAnimation(message);
 
   console.log('✨ 새 메시지가 실시간으로 추가되었습니다:', message.text);
 }
@@ -261,7 +260,7 @@ archiveChannel.addEventListener('message', (event) => {
       loadArchivedMessages();
       break;
     case 'CLEAR_ALL':
-      showEmptyState();
+      loadArchivedMessages(); // 테스트 메시지 다시 로드
       break;
   }
 });
@@ -282,19 +281,6 @@ window.addEventListener('storage', (event) => {
 // 페이지 로드 시 메시지들 로드
 document.addEventListener('DOMContentLoaded', () => {
   loadArchivedMessages();
-
-  // 테스트용: 3초 후 시작하여 10초 간격으로 새 메시지 추가
-  setTimeout(() => {
-    let testCounter = 1;
-    setInterval(() => {
-      const message = {
-        text: `New message ${testCounter++}!`,
-        timestamp: Date.now(),
-        stats: { tap: 5, erase: 0, layer: 0, space: 0 }
-      };
-      addNewMessageWithScrollAnimation(message);
-    }, 10000);
-  }, 3000);
 });
 
 // 키보드 단축키

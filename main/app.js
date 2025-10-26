@@ -26,7 +26,12 @@ let layer=false, confirmAccum=0;
 let dwellProb=new Array(26).fill(0);
 let debugInfo = { lastHit: -1, lastSpeed: 0, lastDwellProb: 0 };
 let touchState = { wasTouching: false, readyToEmit: false, lastHit: -1 };
-let backspaceState = { wasClosed: false, readyToBackspace: false };
+let backspaceState = { 
+  wasClosed: false, 
+  readyToBackspace: false,
+  lastBackspaceTime: 0,
+  backspaceExecuted: false  // 한 번의 사이클에서 백스페이스 실행 여부
+};
 let spaceState = { 
   wasClosed: false, 
   readyToSpace: false, 
@@ -42,7 +47,7 @@ let prayerState = {
   prayerProgress: 0,
   prayerTimer: null,
   lastDetectionTime: 0,
-  detectionThreshold: 200, // 200ms 동안 지속되어야 합장으로 인식
+  detectionThreshold: 400, // 400ms 동안 지속되어야 합장으로 인식
   lastInterruptionTime: 0,
   interruptionThreshold: 500, // 500ms 동안 감지되지 않으면 중단
   consecutiveDetections: 0, // 연속 감지 횟수
@@ -58,27 +63,32 @@ function setCanvasSize(){
 }
 new ResizeObserver(setCanvasSize).observe(document.body);
 
-function renderText(){
+function renderText(animate = false){
   const text = textBuf.join('');
   if(el.outputText) {
     if(text) {
       // 입력된 텍스트가 있으면 표시
       el.outputText.textContent = text;
       el.outputText.style.opacity = '1';
-      el.outputText.style.color = 'white';
       // 텍스트가 있을 때 커서 표시
       el.outputText.classList.remove('no-cursor');
       
-      // 입력 시 시각적 피드백
-      el.outputText.style.color = '#007aff';
-      el.outputText.style.transform = 'scale(1.05)';
-      setTimeout(() => {
-        el.outputText.style.color = 'white';
+      // 입력 시 시각적 피드백 (animate가 true일 때만)
+      if(animate) {
+        el.outputText.style.color = '#007aff';
+        el.outputText.style.transform = 'scale(1.05)';
+        setTimeout(() => {
+          el.outputText.style.color = 'whitesmoke';
+          el.outputText.style.transform = 'scale(1)';
+        }, 200);
+      } else {
+        // 애니메이션이 없을 때는 즉시 색상 설정
+        el.outputText.style.color = 'whitesmoke';
         el.outputText.style.transform = 'scale(1)';
-      }, 200);
+      }
     } else {
       // 입력된 텍스트가 없으면 기본 메시지 표시
-      el.outputText.textContent = '손을 카메라에 보여주세요';
+      el.outputText.textContent = 'Show your hands to camera';
       el.outputText.style.opacity = '0.7';
       el.outputText.style.color = 'rgba(255, 255, 255, 0.7)';
       // 기본 메시지일 때 커서 숨기기
@@ -141,77 +151,84 @@ function regionsFromLeft(left){
   const P = left.map(p=>({x:(1-p.x)*W, y:p.y*H})); // X축 반전 적용
   const R=[];
   
-  // 손바닥 중심점과 크기 계산
-  const palmCenter = mid(P[0], mid(P[5],P[17]));
-  const palmRadius = Math.max(30, dist(P[5],P[17])*0.3); // 더 큰 반지름
+  // 손바닥 크기 계산 - 2560x1440 해상도 최적화
+  const basePalmRadius = dist(P[5],P[17]);
+  // 해상도에 비례하여 버튼 크기 조정 (1.2배)
+  const scale = Math.min(W, H) / 1440; // 2560x1440을 기준으로 스케일 계산
+  const buttonRadius = Math.max(42 * scale, basePalmRadius * 0.24); // 버튼 크기 (1.2배: 35 -> 42)
   
-  // 손 전체 영역을 더 넓게 활용하여 키 배치
+  // 손의 물리적 랜드마크 포인트에 정확히 키 배치
+  // 각 손가락 위에만 키를 배치 (손가락 사이 공간 미사용)
   
-  // 엄지 영역 - 1-3번
-  R.push({c:{x:P[1].x, y:P[1].y}, r:palmRadius*0.8});     // 1: 엄지 시작점 (q)
-  R.push({c:{x:P[2].x, y:P[2].y}, r:palmRadius*0.8});     // 2: 엄지 첫번째 관절 (w)
-  R.push({c:{x:P[3].x, y:P[3].y}, r:palmRadius*0.8});     // 3: 엄지 두번째 관절 (e)
+  // ===== 26개 키 배치 (TOKENS_BASE 순서대로) =====
   
-  // 검지 영역 - 4-6번
-  R.push({c:{x:P[4].x, y:P[4].y}, r:palmRadius*0.8});     // 4: 엄지 끝 (r)
-  R.push({c:{x:P[5].x, y:P[5].y}, r:palmRadius*0.8});     // 5: 검지 시작점 (t)
-  R.push({c:{x:P[6].x, y:P[6].y}, r:palmRadius*0.8});     // 6: 검지 첫번째 관절 (y)
+  const offsetX = -30 * scale; // 왼쪽으로 30픽셀 이동
+  const offsetRight = 30 * scale; // 오른쪽으로 이동
+  const palmDepth = 80 * scale; // 손바닥 깊이 (아래로)
   
-  // 중지 영역 - 7-9번
-  R.push({c:{x:P[7].x, y:P[7].y}, r:palmRadius*0.8});     // 7: 검지 두번째 관절 (u)
-  R.push({c:{x:P[8].x, y:P[8].y}, r:palmRadius*0.8});     // 8: 검지 끝 (i)
-  R.push({c:{x:P[9].x, y:P[9].y}, r:palmRadius*0.8});     // 9: 중지 시작점 (o)
-  
-  // 약지 영역 - 10-12번
-  R.push({c:{x:P[10].x, y:P[10].y}, r:palmRadius*0.8});   // 10: 중지 첫번째 관절 (p)
-  R.push({c:{x:P[11].x, y:P[11].y}, r:palmRadius*0.8});   // 11: 중지 두번째 관절 (a)
-  R.push({c:{x:P[12].x, y:P[12].y}, r:palmRadius*0.8});   // 12: 중지 끝 (s)
-  
-  // 새끼손가락 영역 - 13-15번
-  R.push({c:{x:P[13].x, y:P[13].y}, r:palmRadius*0.8});   // 13: 약지 시작점 (d)
-  R.push({c:{x:P[14].x, y:P[14].y}, r:palmRadius*0.8});   // 14: 약지 첫번째 관절 (f)
-  R.push({c:{x:P[15].x, y:P[15].y}, r:palmRadius*0.8});   // 15: 약지 두번째 관절 (g)
-  
-  // 손바닥 영역 - 16-21번
-  R.push({c:{x:P[16].x, y:P[16].y}, r:palmRadius*0.8});   // 16: 약지 끝 (h)
-  R.push({c:{x:P[17].x, y:P[17].y}, r:palmRadius*0.8});   // 17: 새끼손가락 시작점 (j)
-  R.push({c:{x:P[18].x, y:P[18].y}, r:palmRadius*0.8});   // 18: 새끼손가락 첫번째 관절 (k)
-  R.push({c:{x:P[19].x, y:P[19].y}, r:palmRadius*0.8});   // 19: 새끼손가락 두번째 관절 (l)
-  R.push({c:{x:P[20].x, y:P[20].y}, r:palmRadius*0.8});   // 20: 새끼손가락 끝 (z)
-  R.push({c:{x:P[0].x, y:P[0].y}, r:palmRadius*0.8});     // 21: 손목 (x)
-  
-  // 손바닥 중앙 영역에 추가 키 배치 - 22-26번 (겹치지 않도록 넓게 분산)
-  const palmTop = mid(P[5], P[9]);
-  const palmBottom = mid(P[0], P[17]);
-  const palmLeft = mid(P[5], P[17]);
-  const palmRight = mid(P[9], P[13]);
-  
-  // 손바닥 영역을 더 넓게 확장하여 버튼 배치
-  const widePalmRadius = palmRadius * 1.5;
-  
-  // 손바닥 중심에서 더 멀리 떨어진 위치에 배치
-  const palmTopExtended = {
-    x: palmCenter.x + (palmTop.x - palmCenter.x) * 1.5,
-    y: palmCenter.y + (palmTop.y - palmCenter.y) * 1.5
-  };
-  const palmBottomExtended = {
-    x: palmCenter.x + (palmBottom.x - palmCenter.x) * 1.5,
-    y: palmCenter.y + (palmBottom.y - palmCenter.y) * 1.5
-  };
-  const palmLeftExtended = {
-    x: palmCenter.x + (palmLeft.x - palmCenter.x) * 1.5,
-    y: palmCenter.y + (palmLeft.y - palmCenter.y) * 1.5
-  };
-  const palmRightExtended = {
-    x: palmCenter.x + (palmRight.x - palmCenter.x) * 1.5,
-    y: palmCenter.y + (palmRight.y - palmCenter.y) * 1.5
-  };
-  
-  R.push({c:palmTopExtended, r:palmRadius*0.8});                   // 22: 손바닥 상단 (c)
-  R.push({c:palmBottomExtended, r:palmRadius*0.8});               // 23: 손바닥 하단 (v)
-  R.push({c:palmLeftExtended, r:palmRadius*0.8});                // 24: 손바닥 좌측 (b)
-  R.push({c:palmRightExtended, r:palmRadius*0.8});               // 25: 손바닥 우측 (n)
-  R.push({c:palmCenter, r:palmRadius*0.8});               // 26: 손바닥 중앙 (m)
+  // 0: q (e 좌측 125픽셀 지점)
+  const eX = P[9].x + 20 * scale;
+  const eY = P[9].y + palmDepth + 100 * scale;
+  R.push({c:{x:eX - 125 * scale, y:eY}, r:buttonRadius}); // q
+  // 1: w (엄지 두번째 관절)
+  R.push({c:{x:P[2].x, y:P[2].y}, r:buttonRadius}); // w
+  // 2: e (손바닥 쪽 - o 아래, 추가로 100픽셀 아래)
+  R.push({c:{x:P[9].x + 20 * scale, y:P[9].y + palmDepth + 100 * scale}, r:buttonRadius}); // e
+  // 3: r (손바닥 쪽 - d 아래, 추가로 100픽셀 아래)
+  R.push({c:{x:P[13].x + offsetRight + 50 * scale, y:P[13].y + palmDepth + 100 * scale}, r:buttonRadius}); // r
+  // 4: t (검지 시작, 왼쪽으로 이동)
+  R.push({c:{x:P[5].x + offsetX, y:P[5].y}, r:buttonRadius}); // t
+  // 5: y (검지 첫 관절, 왼쪽으로 이동)
+  R.push({c:{x:P[6].x + offsetX, y:P[6].y}, r:buttonRadius}); // y
+  // 6: u (검지 두번째 관절, 더 왼쪽으로)
+  R.push({c:{x:P[7].x + offsetX - 20 * scale, y:P[7].y}, r:buttonRadius}); // u
+  // 7: i (검지 끝, 더 왼쪽으로)
+  R.push({c:{x:P[8].x + offsetX - 20 * scale, y:P[8].y}, r:buttonRadius}); // i
+  // 8: o (중지 시작, 오른쪽으로 이동)
+  R.push({c:{x:P[9].x + 20 * scale, y:P[9].y}, r:buttonRadius}); // o
+  // 9: p (중지 첫 관절)
+  R.push({c:{x:P[10].x, y:P[10].y}, r:buttonRadius}); // p
+  // 10: a (중지 두번째 관절)
+  R.push({c:{x:P[11].x, y:P[11].y}, r:buttonRadius}); // a
+  // 11: s (중지 끝)
+  R.push({c:{x:P[12].x, y:P[12].y}, r:buttonRadius}); // s
+  // 12: d (약지 시작, 오른쪽으로 이동)
+  R.push({c:{x:P[13].x + offsetRight + 50 * scale, y:P[13].y}, r:buttonRadius}); // d
+  // 13: f (약지 첫 관절, 오른쪽으로 이동)
+  R.push({c:{x:P[14].x + offsetRight, y:P[14].y}, r:buttonRadius}); // f
+  // 14: g (약지 두번째 관절, 오른쪽으로 이동)
+  R.push({c:{x:P[15].x + offsetRight, y:P[15].y}, r:buttonRadius}); // g
+  // 15: h (약지 끝, 오른쪽으로 이동)
+  R.push({c:{x:P[16].x + offsetRight, y:P[16].y}, r:buttonRadius}); // h
+  // 16: j (새끼손가락 시작, 오른쪽 위로 이동)
+  R.push({c:{x:P[17].x + offsetRight + 100 * scale, y:P[17].y - 20 * scale}, r:buttonRadius}); // j
+  // 17: k (새끼손가락 첫 관절, 더 오른쪽으로)
+  R.push({c:{x:P[18].x + offsetRight + 80 * scale, y:P[18].y}, r:buttonRadius}); // k
+  // 18: l (새끼손가락 두번째 관절, 더 오른쪽으로)
+  R.push({c:{x:P[19].x + offsetRight + 80 * scale, y:P[19].y}, r:buttonRadius}); // l
+  // 19: z (새끼손가락 끝, 더 오른쪽으로)
+  R.push({c:{x:P[20].x + offsetRight + 80 * scale, y:P[20].y}, r:buttonRadius}); // z
+  // 20: x (r 아래 200픽셀, 오른쪽으로 100픽셀에서 왼쪽으로 95픽셀)
+  const rX = P[13].x + offsetRight + 50 * scale;
+  const rY = P[13].y + palmDepth + 100 * scale + 200 * scale;
+  R.push({c:{x:rX + 100 * scale - 95 * scale, y:rY}, r:buttonRadius}); // x
+  // 21: c (w와 x 사이)
+  const wX = P[2].x;
+  const wY = P[2].y;
+  const xPos = rX + 100 * scale - 95 * scale;
+  const cX = (wX + xPos) / 2;
+  const cY = (wY + rY) / 2;
+  R.push({c:{x:cX, y:cY}, r:buttonRadius}); // c
+  // 22: v (오른쪽으로 150픽셀에서 왼쪽으로 30픽셀 추가)
+  R.push({c:{x:rX + 150 * scale - 30 * scale, y:rY}, r:buttonRadius}); // v
+  // 23: b (엄지 세번째 관절, 왼쪽으로 이동)
+  R.push({c:{x:P[3].x - 100 * scale, y:P[3].y}, r:buttonRadius}); // b
+  // 24: n (엄지 끝, 왼쪽으로 160픽셀 이동)
+  R.push({c:{x:P[4].x - 160 * scale, y:P[4].y}, r:buttonRadius}); // n
+  // 25: m (r 우측 125픽셀)
+  const rPosX = P[13].x + offsetRight + 50 * scale + 125 * scale;
+  const rPosY = P[13].y + palmDepth + 100 * scale;
+  R.push({c:{x:rPosX, y:rPosY}, r:buttonRadius}); // m
   
   return R;
 }
@@ -266,10 +283,25 @@ function isHandClosed(hand){
 }
 
 function emitBackspace(){
+  // 합장 중이면 입력 무시
+  if (prayerState.isPraying) {
+    console.log('🙏 합장 중: 백스페이스 입력 무시');
+    return;
+  }
+  
+  const currentTime = performance.now();
+  
+  // 쿨다운 체크: 마지막 백스페이스 실행 후 500ms 이내면 실행하지 않음
+  if (currentTime - backspaceState.lastBackspaceTime < 500) {
+    console.log(`🗑️ 백스페이스 쿨다운 중... (${500 - (currentTime - backspaceState.lastBackspaceTime)}ms 남음)`);
+    return;
+  }
+  
   if(textBuf.length > 0) {
     const removed = textBuf.pop();
     stats.erase++;
-    renderText();
+    backspaceState.lastBackspaceTime = currentTime;
+    renderText(true); // 백스페이스도 애니메이션과 함께
     console.log(`🗑️ 백스페이스 실행! 제거된 글자: "${removed}", 남은 글자: ${textBuf.length}개`);
   } else {
     console.log(`🗑️ 백스페이스 시도했지만 삭제할 글자가 없음`);
@@ -277,6 +309,12 @@ function emitBackspace(){
 }
 
 function emitSpace(){
+  // 합장 중이면 입력 무시
+  if (prayerState.isPraying) {
+    console.log('🙏 합장 중: 스페이스바 입력 무시');
+    return;
+  }
+  
   const currentTime = performance.now();
   
   // 쿨다운 체크: 마지막 스페이스바 실행 후 300ms 이내면 실행하지 않음
@@ -288,26 +326,22 @@ function emitSpace(){
   textBuf.push(' ');
   stats.space++;
   spaceState.lastSpaceTime = currentTime;
-  renderText();
+  renderText(false); // 스페이스바는 애니메이션 없이
   console.log(`␣ 스페이스바 실행! 현재 텍스트: "${textBuf.join('')}"`);
-  
-  // 스페이스바 입력 시 커서 깜빡임 효과
-  if(el.outputText) {
-    el.outputText.style.color = '#007aff';
-    el.outputText.style.transform = 'scale(1.05)';
-    setTimeout(() => {
-      el.outputText.style.color = '#1d1d1f';
-      el.outputText.style.transform = 'scale(1)';
-    }, 200);
-  }
 }
 
 function emitToken(i){
+  // 합장 중이면 입력 무시
+  if (prayerState.isPraying) {
+    console.log('🙏 합장 중: 입력 무시');
+    return;
+  }
+  
   const tok = (layer? TOKENS_ALT[i] : TOKENS_BASE[i]);
   console.log(`🎯 토큰 출력 성공! 인덱스 ${i+1}, 값 "${tok}", 레이어: ${layer ? 'ALT' : 'BASE'}`);
   textBuf.push(tok);
   stats.tap++;
-  renderText();
+  renderText(true); // 애니메이션과 함께 렌더링
   console.log(`📝 현재 텍스트 버퍼:`, textBuf);
   console.log(`📊 통계 업데이트: tap=${stats.tap}`);
 }
@@ -413,13 +447,13 @@ function detectPrayer(left, right) {
     console.log(`🙏 합장 거리: 손가락 최소 ${minDistance.toFixed(1)}px, 손바닥 중심 ${palmDistance.toFixed(1)}px, 손바닥 영역 ${palmAreaDistance.toFixed(1)}px`);
   }
   
-  // 더 관대한 조건으로 조정
-  const fingerClose = minDistance < 120;  // 손가락 끝점이 120px 이내 (80px → 120px)
-  const palmClose = palmDistance < 200;   // 손바닥 중심이 200px 이내 (150px → 200px)
-  const palmAreaClose = palmAreaDistance < 180; // 손바닥 영역이 180px 이내
+  // 적절한 거리 조건으로 조정
+  const fingerClose = minDistance < 120;   // 손가락 끝점이 120px 이내
+  const palmClose = palmDistance < 180;   // 손바닥 중심이 180px 이내
+  const palmAreaClose = palmAreaDistance < 160; // 손바닥 영역이 160px 이내
   
-  // 세 조건 중 하나라도 만족하면 합장으로 인식 (OR 조건)
-  const isPraying = fingerClose || palmClose || palmAreaClose;
+  // 손가락이 가까우거나 손바닥이 가까우면 합장으로 인식 (OR 조건으로 변경)
+  const isPraying = (fingerClose || palmClose) && palmAreaClose;
   
   if (isPraying && Math.floor(performance.now() / 100) % 10 === 0) {
     console.log(`🙏 합장 감지됨! 손가락: ${minDistance.toFixed(1)}px, 손바닥 중심: ${palmDistance.toFixed(1)}px, 손바닥 영역: ${palmAreaDistance.toFixed(1)}px`);
@@ -431,26 +465,25 @@ function detectPrayer(left, right) {
 // 원들을 순차적으로 채우는 함수
 function fillDotsSequentially() {
   const dots = document.querySelectorAll('.loading-dot');
-  let currentDot = 0;
   
   // 모든 원 초기화
   dots.forEach(dot => {
     dot.classList.remove('filled');
   });
   
-  // 순차적으로 원 채우기
+  // 순차적으로 원 채우기 - 정확히 2초 동안 8개 채우기
+  let currentDot = 0;
+  
   const fillInterval = setInterval(() => {
     if (currentDot < dots.length) {
       dots[currentDot].classList.add('filled');
       currentDot++;
     } else {
       clearInterval(fillInterval);
-      // 모든 원이 채워지면 메시지 전송
-      setTimeout(() => {
-        completePrayer();
-      }, 200); // 마지막 원이 채워진 후 잠깐 대기
+      // 모든 원이 채워지면 즉시 완료
+      completePrayer();
     }
-  }, 250); // 250ms마다 하나씩 채우기 (2초 / 8개 = 250ms)
+  }, 250); // 정확히 250ms마다 하나씩 채우기 (2초 / 8개 = 250ms)
 }
 
 // 합장 시작
@@ -574,7 +607,7 @@ function prayerConfirm(left,right){
       console.log(`🙏 합장 감지 시작 - 연속 감지: ${prayerState.consecutiveDetections}`);
     }
     
-    // 일정 시간(200ms) 이상 지속되고 연속 감지가 3회 이상이면 합장 시작
+    // 일정 시간(400ms) 이상 지속되고 연속 감지가 3회 이상이면 합장 시작
     if (!prayerState.isPraying && 
         currentTime - prayerState.lastDetectionTime >= prayerState.detectionThreshold &&
         prayerState.consecutiveDetections >= 3) {
@@ -675,7 +708,8 @@ async function loop(){
 
   let rois=null;
   if(left){
-    // 왼손 커서 제거됨
+    // 왼손 랜드마크 그리기 (디버깅용)
+    drawLandmarks(left);
     
     // 왼손 스페이스바 감지 - 한 번의 사이클에서 한 번만 실행
     const isLeftClosed = isHandClosed(left);
@@ -699,6 +733,11 @@ async function loop(){
     
     rois = regionsFromLeft(left);
     ctx.globalAlpha = 0.9;
+    
+    // 버튼 크기에 맞게 텍스트 크기 계산 (버튼 반지름에 비례)
+    const firstButtonRadius = rois[0]?.r || 42;
+    const textSize = firstButtonRadius * 0.6; // 버튼 반지름의 60%
+    
     for(let i=0;i<rois.length;i++){
       const {c,r} = rois[i];
       
@@ -713,9 +752,9 @@ async function loop(){
       ctx.lineWidth=2; 
       ctx.stroke();
       
-      // 텍스트를 원 안에 중앙 정렬
+      // 텍스트를 원 안에 중앙 정렬 (세리프체)
       ctx.fillStyle='#1d1d1f'; 
-      ctx.font='bold 16px ui-sans-serif'; 
+      ctx.font=`normal ${Math.floor(textSize)}px Times New Roman, serif`; 
       ctx.textAlign='center'; 
       ctx.textBaseline='middle'; 
       ctx.fillText(TOKENS_BASE[i], c.x, c.y);
@@ -723,9 +762,16 @@ async function loop(){
   }
 
   if(right){
+    // 오른손 랜드마크 그리기 (디버깅용)
+    drawLandmarks(right);
+    
     const W = el.overlay.width, H = el.overlay.height;
     
+    // 스케일 계산 (2560x1440 기준)
+    const scale = Math.min(W, H) / 1440;
+    
     // 손이 웹캠에 다 잡히지 않을 때를 대비한 안정적인 커서 위치 계산
+    // X축 반전 적용
     let tip;
     if(right[8] && right[8].x !== undefined && right[8].y !== undefined) {
       // 검지 끝이 정상적으로 감지된 경우
@@ -744,18 +790,31 @@ async function loop(){
       tip = {x:W/2, y:H/2};
     }
     
-    ctx.beginPath(); ctx.arc(tip.x, tip.y, 10, 0, Math.PI*2);
-    ctx.strokeStyle='#9ee37d'; ctx.lineWidth=3; ctx.stroke();
+    // 커서를 더 크고 명확하게 그리기 (1.5배, 버건디색)
+    const cursorRadius = 22 * scale; // 15 * 1.5 = 22.5, 스케일 적용
+    ctx.beginPath(); ctx.arc(tip.x, tip.y, cursorRadius, 0, Math.PI*2);
+    ctx.fillStyle='rgba(128, 0, 32, 0.3)'; // 버건디색 투명도
+    ctx.fill();
+    ctx.strokeStyle='#800020'; ctx.lineWidth=4; ctx.stroke();
 
-    // 오른손 백스페이스 감지
+    // 오른손 백스페이스 감지 - 한 번의 사이클에서 한 번만 실행
     const isRightClosed = isHandClosed(right);
+    
     if(isRightClosed && !backspaceState.wasClosed) {
+      // 손이 쥐어지기 시작
       backspaceState.wasClosed = true;
-      console.log(`✊ 오른손 쥐어짐 - 백스페이스 준비`);
-    } else if(!isRightClosed && backspaceState.wasClosed) {
-      console.log(`✋ 오른손 펴짐 - 백스페이스 실행`);
+      backspaceState.backspaceExecuted = false;  // 새로운 사이클 시작
+      console.log(`✊ 오른손 쥐어짐 - 백스페이스 사이클 시작`);
+    } else if(!isRightClosed && backspaceState.wasClosed && !backspaceState.backspaceExecuted) {
+      // 손이 펼쳐지고 아직 백스페이스가 실행되지 않았을 때만 실행
+      console.log(`✋ 오른손 펴짐 - 백스페이스 실행 (한 번만)`);
       emitBackspace();
+      backspaceState.backspaceExecuted = true;  // 이 사이클에서 실행 완료
+    } else if(!isRightClosed && backspaceState.wasClosed && backspaceState.backspaceExecuted) {
+      // 손이 완전히 펼쳐져서 사이클 종료
       backspaceState.wasClosed = false;
+      backspaceState.backspaceExecuted = false;
+      console.log(`✋ 오른손 완전히 펼쳐짐 - 백스페이스 사이클 종료`);
     }
 
     if(rois){
@@ -770,7 +829,7 @@ async function loop(){
       
       for(let i=0;i<dwellProb.length;i++){
         const target = (i===hit);
-        dwellProb[i] = 0.8*dwellProb[i] + (target?0.2:0); // 더 빠른 반응을 위해 조정
+        dwellProb[i] = 0.7*dwellProb[i] + (target?0.3:0); // 더 빠른 반응을 위해 조정
       }
       
       if(hit>=0){
@@ -794,12 +853,6 @@ async function loop(){
         }
         debugInfo.lastSpeed = speed;
         
-        // 터치 감지 시 즉시 피드백 표시
-        ctx.fillStyle = '#ff6b6b';
-        ctx.font = 'bold 16px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(`터치! ${hit+1}`, rois[hit].c.x, rois[hit].c.y - 30);
-        
         // 디버깅: 현재 상태 출력
         console.log(`🔍 터치 상태: hit=${hit+1}, dwell=${p.toFixed(2)}, speed=${speed.toFixed(1)}`);
         
@@ -809,15 +862,10 @@ async function loop(){
           touchState.lastHit = hit;
         }
         
-        // 로딩이 충분히 차면 입력 준비 상태로 설정
-        if(p>0.8 && !touchState.readyToEmit) {
+        // 로딩이 충분히 차면 입력 준비 상태로 설정 (더 빠른 반응)
+        if(p>0.6 && !touchState.readyToEmit) {
           touchState.readyToEmit = true;
           console.log(`⏳ 입력 준비 완료: hit=${hit+1}, dwell=${p.toFixed(2)}`);
-          
-          // 준비 완료 시각적 피드백
-          ctx.fillStyle = '#fbbf24';
-          ctx.font = 'bold 18px Arial';
-          ctx.fillText('READY', rois[hit].c.x, rois[hit].c.y - 50);
         }
         
       } else {
@@ -826,11 +874,6 @@ async function loop(){
           console.log(`🎯 터치 해제 감지! 입력 실행: hit=${touchState.lastHit+1}`);
           emitToken(touchState.lastHit);
           dwellProb[touchState.lastHit] = 0;
-          
-          // 성공 피드백
-          ctx.fillStyle = '#22c55e';
-          ctx.font = 'bold 20px Arial';
-          ctx.fillText('✓', rois[touchState.lastHit].c.x, rois[touchState.lastHit].c.y - 50);
         }
         
         // 터치 상태 리셋
@@ -895,7 +938,12 @@ function resetAll(){
   textBuf=[]; stats={tap:0, erase:0, layer:0, space:0}; layer=false; confirmAccum=0; dwellProb.fill(0); 
   debugInfo = { lastHit: -1, lastSpeed: 0, lastDwellProb: 0 };
   touchState = { wasTouching: false, readyToEmit: false, lastHit: -1 };
-  backspaceState = { wasClosed: false, readyToBackspace: false };
+  backspaceState = { 
+    wasClosed: false, 
+    readyToBackspace: false,
+    lastBackspaceTime: 0,
+    backspaceExecuted: false
+  };
   spaceState = { 
     wasClosed: false, 
     readyToSpace: false, 
@@ -912,14 +960,14 @@ function resetAll(){
     prayerProgress: 0,
     prayerTimer: null,
     lastDetectionTime: 0,
-    detectionThreshold: 200,
+    detectionThreshold: 400,
     lastInterruptionTime: 0,
     interruptionThreshold: 500,
     consecutiveDetections: 0,
     consecutiveMisses: 0
   };
   
-  renderText();
+  renderText(false); // 리셋 시에는 애니메이션 없이
   if(el.layerChip) {
     el.layerChip.textContent='소문자';
   }
