@@ -347,7 +347,7 @@ function emitToken(i){
 }
 
 function exportCard(){
-  const text = textBuf.join(' ');
+  const text = textBuf.join('');
   
   // 빈 텍스트인 경우 아카이브로 보내지 않음
   if (!text || text.trim() === '') {
